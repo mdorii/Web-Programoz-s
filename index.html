@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cukrászda – Főoldal</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .page-card {
+      background: var(--white);
+      border-radius: 14px;
+      box-shadow: 0 4px 20px var(--shadow);
+      padding: 1.8rem;
+      text-decoration: none;
+      color: var(--cocoa);
+      transition: transform .2s, box-shadow .2s;
+      border-top: 4px solid var(--burgundy);
+      display: flex;
+      flex-direction: column;
+      gap: .6rem;
+    }
+    .page-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px var(--shadow); }
+    .page-card .icon { font-size: 2.2rem; }
+    .page-card h3 { font-family: 'Playfair Display', serif; color: var(--burgundy); font-size: 1.15rem; }
+    .page-card p  { font-size: .88rem; color: #666; line-height: 1.55; }
+    .page-card .tag {
+      display: inline-block;
+      margin-top: auto;
+      padding: .25rem .7rem;
+      background: var(--blush);
+      color: var(--burgundy);
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 500;
+      align-self: flex-start;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    .stat-box {
+      background: var(--white);
+      border-radius: 12px;
+      padding: 1.4rem;
+      text-align: center;
+      box-shadow: 0 3px 12px var(--shadow);
+    }
+    .stat-box .num { font-family: 'Playfair Display', serif; font-size: 2.2rem; color: var(--burgundy); }
+    .stat-box .lbl { font-size: .82rem; color: #888; margin-top: .2rem; text-transform: uppercase; letter-spacing: .05em; }
+
+    .intro { max-width: 680px; margin: 0 auto 2rem; text-align: center; color: #555; line-height: 1.7; }
+  </style>
+</head>
+<body>
+
+<nav id="main-nav"></nav>
+
+<header class="site-header">
+  <h1>Web programozás-1 Előadás Házi feladat</h1>
+  <p class="subtitle">🍰 Cukrászda adatbázis-kezelő rendszer</p>
+</header>
+
+<main>
+  <p class="intro">
+    Ez a webalkalmazás egy cukrászda süteménykínálatának adatbázisát kezeli.
+    Az oldal különböző technológiákat mutat be, beleértve a Vanilla JavaScript-et,
+    React-ot, SPA-t, Fetch API-t, Axios-t és objektumorientált JavaScript-et.
+  </p>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-box"><div class="num">139</div><div class="lbl">Sütemény féle</div></div>
+    <div class="stat-box"><div class="num">208</div><div class="lbl">Árbejegyzés</div></div>
+    <div class="stat-box"><div class="num">45</div><div class="lbl">Mentesség adat</div></div>
+    <div class="stat-box"><div class="num">6</div><div class="lbl">Technológia</div></div>
+  </div>
+
+  <!-- Page Cards -->
+  <div class="card">
+    <h2>📚 Oldalak</h2>
+    <div class="hero-grid">
+      <a class="page-card" href="javascript.html">
+        <span class="icon">⚙️</span>
+        <h3>JavaScript CRUD</h3>
+        <p>Vanilla JavaScript alapú CRUD alkalmazás, ahol az adatok tömbbe kerülnek tárolásra. Sütemények kezelése szűréssel és lapozással.</p>
+        <span class="tag">Vanilla JS</span>
+      </a>
+      <a class="page-card" href="react.html">
+        <span class="icon">⚛️</span>
+        <h3>React CRUD</h3>
+        <p>React alapú CRUD alkalmazás, hooks-szal és komponensekkel. Az árak táblázata szerkeszthető és bővíthető.</p>
+        <span class="tag">React 18</span>
+      </a>
+      <a class="page-card" href="spa.html">
+        <span class="icon">📱</span>
+        <h3>Single Page Application</h3>
+        <p>Kétmenüs SPA React-ban: Sütemény kvíz-játék és Ár-kalkulátor alkalmazás – komponensekkel és useState hook-kal.</p>
+        <span class="tag">React SPA</span>
+      </a>
+      <a class="page-card" href="fetchapi.html">
+        <span class="icon">🌐</span>
+        <h3>Fetch API CRUD</h3>
+        <p>JavaScript és Fetch API alapú CRUD alkalmazás, valós szerveroldali SQLite adatbázissal. Aszinkron adatkezelés.</p>
+        <span class="tag">Fetch + Node.js</span>
+      </a>
+      <a class="page-card" href="axios.html">
+        <span class="icon">🔄</span>
+        <h3>Axios + React CRUD</h3>
+        <p>React + Axios alapú teljes CRUD alkalmazás, interceptor-okkal és hibakezeléssel. Valós REST API hívások.</p>
+        <span class="tag">React + Axios</span>
+      </a>
+      <a class="page-card" href="oojs.html">
+        <span class="icon">🎨</span>
+        <h3>OO JavaScript</h3>
+        <p>Objektumorientált JavaScript grafikus alkalmazás osztályokkal, öröklődéssel, konstruktorokkal és canvas-szal.</p>
+        <span class="tag">OOP JS</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- DB description -->
+  <div class="card">
+    <h2>🗃️ Adatbázis felépítése</h2>
+    <p style="margin-bottom:1rem; color:#555; line-height:1.7;">
+      A cukrászda adatbázisa három táblából áll:
+    </p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1rem;">
+      <div style="background:var(--cream); border-radius:10px; padding:1.2rem; border-left:4px solid var(--burgundy);">
+        <strong style="color:var(--burgundy);">suti</strong>
+        <p style="font-size:.85rem; color:#666; margin-top:.4rem;">id, nev, tipus, dijazott – A sütemények alaptáblája</p>
+      </div>
+      <div style="background:var(--cream); border-radius:10px; padding:1.2rem; border-left:4px solid var(--gold);">
+        <strong style="color:var(--burgundy);">ar</strong>
+        <p style="font-size:.85rem; color:#666; margin-top:.4rem;">id, sutiid, ertek, egyseg – Árszabás és egységek</p>
+      </div>
+      <div style="background:var(--cream); border-radius:10px; padding:1.2rem; border-left:4px solid var(--rose);">
+        <strong style="color:var(--burgundy);">tartalom</strong>
+        <p style="font-size:.85rem; color:#666; margin-top:.4rem;">id, sutiid, mentes – Mentességi információk (G, L, HC…)</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer id="main-footer"></footer>
+<script src="js/shared-nav.js"></script>
+</body>
+</html>
