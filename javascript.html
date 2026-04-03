@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cukrászda – JavaScript CRUD</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .action-bar { display:flex; gap:.8rem; flex-wrap:wrap; align-items:center; margin-bottom:1.2rem; }
+    .filter-row { display:flex; gap:.8rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem; }
+    .filter-row select, .filter-row input { max-width:200px; }
+  </style>
+</head>
+<body>
+
+<nav id="main-nav"></nav>
+
+<header class="site-header">
+  <h1>Web programozás-1 Előadás Házi feladat</h1>
+  <p class="subtitle">⚙️ Vanilla JavaScript CRUD – Sütik kezelése</p>
+</header>
+
+<main>
+  <!-- ALERT -->
+  <div id="alert" class="alert"></div>
+
+  <!-- FORM CARD -->
+  <div class="card">
+    <h2 id="form-title">➕ Új sütemény hozzáadása</h2>
+    <input type="hidden" id="edit-id" />
+    <div class="form-row">
+      <div>
+        <label for="inp-nev">Sütemény neve *</label>
+        <input id="inp-nev" type="text" placeholder="pl. Dobos torta" />
+      </div>
+      <div>
+        <label for="inp-tipus">Típus *</label>
+        <select id="inp-tipus">
+          <option value="">– válassz –</option>
+          <option>torta</option>
+          <option>tortaszelet</option>
+          <option>pite</option>
+          <option>bejgli</option>
+          <option>krémes</option>
+          <option>vegyes</option>
+          <option>édes teasütemény</option>
+          <option>sós teasütemény</option>
+          <option>tejszínes sütemény</option>
+          <option>különleges torta</option>
+        </select>
+      </div>
+      <div>
+        <label for="inp-dijazott">Díjazott?</label>
+        <select id="inp-dijazott">
+          <option value="0">Nem</option>
+          <option value="-1">Igen</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex; gap:.8rem; flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveSuti()">💾 Mentés</button>
+      <button class="btn btn-warning" onclick="resetForm()">✖ Mégsem</button>
+    </div>
+  </div>
+
+  <!-- TABLE CARD -->
+  <div class="card">
+    <h2>📋 Sütemény lista</h2>
+    <div class="filter-row">
+      <input id="search" type="text" placeholder="🔍 Keresés névre…" oninput="renderTable()" />
+      <select id="filter-tipus" onchange="renderTable()">
+        <option value="">Minden típus</option>
+        <option>torta</option>
+        <option>tortaszelet</option>
+        <option>pite</option>
+        <option>bejgli</option>
+        <option>krémes</option>
+        <option>vegyes</option>
+        <option>édes teasütemény</option>
+        <option>sós teasütemény</option>
+        <option>tejszínes sütemény</option>
+        <option>különleges torta</option>
+      </select>
+      <select id="filter-dij" onchange="renderTable()">
+        <option value="">Díjazott szűrő</option>
+        <option value="-1">Díjazott</option>
+        <option value="0">Nem díjazott</option>
+      </select>
+      <button class="btn btn-success btn-sm" onclick="exportCSV()">⬇ CSV export</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('id')"    style="cursor:pointer;">ID ↕</th>
+            <th onclick="sortBy('nev')"   style="cursor:pointer;">Név ↕</th>
+            <th onclick="sortBy('tipus')" style="cursor:pointer;">Típus ↕</th>
+            <th>Díjazott</th>
+            <th>Műveletek</th>
+          </tr>
+        </thead>
+        <tbody id="suti-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+    <p id="count-label" style="text-align:right; font-size:.82rem; color:#888; margin-top:.5rem;"></p>
+  </div>
+</main>
+
+<footer id="main-footer"></footer>
+<script src="js/shared-nav.js"></script>
+<script>
+/* =====================================================
+   Vanilla JavaScript CRUD – adatok tömbben tárolva
+   Madarász Dóra | TFO727
+   ===================================================== */
+
+// ── Adatok ───────────────────────────────────────────────
+let sutiArray = [
+  {id:1,nev:'Süni',tipus:'vegyes',dijazott:0},
+  {id:2,nev:'Gesztenyealagút',tipus:'vegyes',dijazott:0},
+  {id:3,nev:'Sajtos pogácsa',tipus:'sós teasütemény',dijazott:0},
+  {id:4,nev:'Diós-mákos',tipus:'bejgli',dijazott:0},
+  {id:5,nev:'Sajttorta (málnás)',tipus:'torta',dijazott:0},
+  {id:6,nev:'Citrom',tipus:'torta',dijazott:0},
+  {id:7,nev:'Eszterházy',tipus:'tortaszelet',dijazott:0},
+  {id:8,nev:'Rákóczi-túrós',tipus:'pite',dijazott:0},
+  {id:9,nev:'Meggyes kocka',tipus:'tejszínes sütemény',dijazott:0},
+  {id:10,nev:'Legényfogó',tipus:'torta',dijazott:-1},
+  {id:11,nev:'Alpesi karamell',tipus:'tortaszelet',dijazott:0},
+  {id:12,nev:'Kókuszcsók',tipus:'édes teasütemény',dijazott:0},
+  {id:13,nev:'Habos mákos',tipus:'pite',dijazott:0},
+  {id:14,nev:'Szilvás',tipus:'pite',dijazott:0},
+  {id:15,nev:'Juhtúrós párna',tipus:'sós teasütemény',dijazott:0},
+  {id:16,nev:'Mákos guba',tipus:'tortaszelet',dijazott:0},
+  {id:17,nev:'Néró',tipus:'édes teasütemény',dijazott:0},
+  {id:18,nev:'Sacher',tipus:'tortaszelet',dijazott:0},
+  {id:19,nev:'Citrom',tipus:'tortaszelet',dijazott:0},
+  {id:20,nev:'Ribizlihabos-almás réteges',tipus:'különleges torta',dijazott:-1},
+  {id:21,nev:'Három kívánság',tipus:'torta',dijazott:-1},
+  {id:22,nev:'Dobos',tipus:'torta',dijazott:0},
+  {id:23,nev:'Epres mascarpone',tipus:'tortaszelet',dijazott:0},
+  {id:24,nev:'Csokoládémousse',tipus:'torta',dijazott:0},
+  {id:25,nev:'Oroszkrém',tipus:'torta',dijazott:0},
+  {id:26,nev:'Medvetalp',tipus:'vegyes',dijazott:0},
+  {id:27,nev:'Trüffel',tipus:'torta',dijazott:0},
+  {id:28,nev:'Tejszínes gyümölcsös (meggy)',tipus:'torta',dijazott:0},
+  {id:29,nev:'Mákos-szilvalekváros',tipus:'bejgli',dijazott:0},
+  {id:30,nev:'Ribizlihabos-almás réteges tortaszelet',tipus:'tortaszelet',dijazott:0},
+  {id:31,nev:'Marcipános vágott',tipus:'édes teasütemény',dijazott:0},
+  {id:32,nev:'Indiáner',tipus:'vegyes',dijazott:0},
+  {id:33,nev:'Meggyes',tipus:'pite',dijazott:0},
+  {id:34,nev:'Mákos',tipus:'bejgli',dijazott:0},
+  {id:35,nev:'Sós karamella',tipus:'torta',dijazott:0},
+  {id:36,nev:'Legényfogó',tipus:'tortaszelet',dijazott:0},
+  {id:37,nev:'Rigó Jancsi',tipus:'torta',dijazott:0},
+  {id:38,nev:'Tejszínes gyümölcsös (erdei gyümölcs)',tipus:'torta',dijazott:0},
+  {id:39,nev:'Ez+Az (csokoládé és gesztenye)',tipus:'torta',dijazott:0},
+  {id:40,nev:'Málnás mascarpone',tipus:'torta',dijazott:0},
+  {id:41,nev:'Dobos',tipus:'tortaszelet',dijazott:0},
+  {id:42,nev:'Ferrero',tipus:'torta',dijazott:0},
+  {id:43,nev:'Vegyes házi pite falatok',tipus:'pite',dijazott:0},
+  {id:44,nev:'Ökörszem',tipus:'édes teasütemény',dijazott:0},
+  {id:45,nev:'Danubius kocka',tipus:'tejszínes sütemény',dijazott:0},
+  {id:46,nev:'Sajtkrémmel töltött fánkocska',tipus:'sós teasütemény',dijazott:0},
+  {id:47,nev:'Túrókrém gyümölccsel díszítve',tipus:'tortaszelet',dijazott:0},
+  {id:48,nev:'Almás',tipus:'pite',dijazott:0},
+  {id:49,nev:'Mignon',tipus:'vegyes',dijazott:0},
+  {id:50,nev:'Csokoládémousse fényes csokoládéval',tipus:'torta',dijazott:0}
+];
+
+let nextId     = Math.max(...sutiArray.map(s => s.id)) + 1;
+let currentPage = 1;
+const PER_PAGE = 10;
+let sortKey    = 'id';
+let sortAsc    = true;
+
+// ── Segédfüggvények ───────────────────────────────────────
+function showAlert(msg, type = 'success') {
+  const el = document.getElementById('alert');
+  el.textContent  = msg;
+  el.className    = `alert alert-${type} show`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function getFiltered() {
+  const q    = document.getElementById('search').value.toLowerCase();
+  const tip  = document.getElementById('filter-tipus').value;
+  const dij  = document.getElementById('filter-dij').value;
+  return sutiArray.filter(s => {
+    if (q   && !s.nev.toLowerCase().includes(q))        return false;
+    if (tip && s.tipus !== tip)                          return false;
+    if (dij !== '' && String(s.dijazott) !== dij)        return false;
+    return true;
+  }).sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    return sortAsc
+      ? (av > bv ? 1 : av < bv ? -1 : 0)
+      : (av < bv ? 1 : av > bv ? -1 : 0);
+  });
+}
+
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  renderTable();
+}
+
+// ── Render ────────────────────────────────────────────────
+function renderTable() {
+  const filtered = getFiltered();
+  const total    = filtered.length;
+  const pages    = Math.max(1, Math.ceil(total / PER_PAGE));
+  if (currentPage > pages) currentPage = pages;
+
+  const slice = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  document.getElementById('suti-tbody').innerHTML = slice.length
+    ? slice.map(s => `
+        <tr>
+          <td>${s.id}</td>
+          <td>${s.nev}</td>
+          <td><span class="badge" style="background:#f0e4e4;color:var(--burgundy)">${s.tipus}</span></td>
+          <td>${s.dijazott === -1
+            ? '<span class="badge badge-yes">🏆 Igen</span>'
+            : '<span class="badge badge-no">–</span>'}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-warning btn-sm" onclick="editSuti(${s.id})">✏️ Szerkesztés</button>
+            <button class="btn btn-danger  btn-sm" onclick="deleteSuti(${s.id})" style="margin-left:.3rem;">🗑️ Törlés</button>
+          </td>
+        </tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:2rem;color:#999;">Nincs találat</td></tr>';
+
+  // Pagination
+  let pg = '';
+  for (let i = 1; i <= pages; i++) {
+    pg += `<button class="${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+  }
+  document.getElementById('pagination').innerHTML = pg;
+  document.getElementById('count-label').textContent =
+    `${total} rekord, ${currentPage}/${pages} oldal`;
+}
+
+function goPage(n) { currentPage = n; renderTable(); }
+
+// ── CRUD ──────────────────────────────────────────────────
+function saveSuti() {
+  const nev     = document.getElementById('inp-nev').value.trim();
+  const tipus   = document.getElementById('inp-tipus').value;
+  const dij     = parseInt(document.getElementById('inp-dijazott').value);
+  const editId  = document.getElementById('edit-id').value;
+
+  if (!nev || !tipus) { showAlert('⚠️ A név és típus megadása kötelező!', 'error'); return; }
+
+  if (editId) {
+    // UPDATE
+    const idx = sutiArray.findIndex(s => s.id === parseInt(editId));
+    if (idx !== -1) {
+      sutiArray[idx] = { id: parseInt(editId), nev, tipus, dijazott: dij };
+      showAlert('✅ Sütemény sikeresen módosítva!');
+    }
+  } else {
+    // CREATE
+    sutiArray.push({ id: nextId++, nev, tipus, dijazott: dij });
+    showAlert('✅ Új sütemény sikeresen hozzáadva!');
+  }
+
+  resetForm();
+  renderTable();
+}
+
+function editSuti(id) {
+  const s = sutiArray.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('edit-id').value        = s.id;
+  document.getElementById('inp-nev').value        = s.nev;
+  document.getElementById('inp-tipus').value      = s.tipus;
+  document.getElementById('inp-dijazott').value   = String(s.dijazott);
+  document.getElementById('form-title').textContent = `✏️ Szerkesztés: ${s.nev}`;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteSuti(id) {
+  const s = sutiArray.find(x => x.id === id);
+  if (!s) return;
+  if (!confirm(`Biztosan törli? \n„${s.nev}"`)) return;
+  sutiArray = sutiArray.filter(x => x.id !== id);
+  showAlert(`🗑️ „${s.nev}" törölve.`);
+  renderTable();
+}
+
+function resetForm() {
+  document.getElementById('edit-id').value         = '';
+  document.getElementById('inp-nev').value         = '';
+  document.getElementById('inp-tipus').value       = '';
+  document.getElementById('inp-dijazott').value    = '0';
+  document.getElementById('form-title').textContent = '➕ Új sütemény hozzáadása';
+}
+
+function exportCSV() {
+  const filtered = getFiltered();
+  const header   = 'ID;Nev;Tipus;Dijazott\n';
+  const rows     = filtered.map(s =>
+    `${s.id};"${s.nev}";"${s.tipus}";${s.dijazott === -1 ? 'Igen' : 'Nem'}`
+  ).join('\n');
+  const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href  = URL.createObjectURL(blob);
+  link.download = 'suti_export.csv';
+  link.click();
+}
+
+// ── Init ──────────────────────────────────────────────────
+renderTable();
+</script>
+</body>
+</html>

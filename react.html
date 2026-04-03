@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cukrászda – React CRUD</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(61,31,31,.5); z-index:999; align-items:center; justify-content:center; }
+    .modal-overlay.open { display:flex; }
+  </style>
+</head>
+<body>
+
+<nav id="main-nav"></nav>
+
+<header class="site-header">
+  <h1>Web programozás-1 Előadás Házi feladat</h1>
+  <p class="subtitle">⚛️ React CRUD – Árak kezelése</p>
+</header>
+
+<main>
+  <div id="react-root"></div>
+</main>
+
+<footer id="main-footer"></footer>
+<script src="js/shared-nav.js"></script>
+
+<!-- React 18 CDN -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+/* =====================================================
+   React CRUD – Ár tábla kezelése
+   Madarász Dóra | TFO727
+   ===================================================== */
+
+const { useState, useEffect, useMemo } = React;
+
+// ── Kezdeti adatok ────────────────────────────────────────
+const SUTI_NAMES = {
+  1:'Süni', 2:'Gesztenyealagút', 3:'Sajtos pogácsa', 4:'Diós-mákos',
+  5:'Sajttorta (málnás)', 6:'Citrom', 7:'Eszterházy', 8:'Rákóczi-túrós',
+  9:'Meggyes kocka', 10:'Legényfogó', 20:'Ribizlihabos-almás réteges',
+  22:'Dobos', 24:'Csokoládémousse', 25:'Oroszkrém', 27:'Trüffel',
+  28:'Tejszínes gyümölcsös (meggy)', 35:'Sós karamella', 37:'Rigó Jancsi',
+  38:'Tejszínes gy. (erdei)', 39:'Ez+Az', 40:'Málnás mascarpone',
+  42:'Ferrero', 50:'Csokoládémousse (fényes)', 59:'Lúdláb',
+  60:'Sacher', 61:'Eszterházy', 68:'Pisztáciás-málnás',
+  71:'Túrókrém gyümölccsel', 74:'Palermo', 76:'Ünnepi diótorta',
+  81:'Tejszínes gy. (málna)', 82:'Marcipános csokoládé',
+  89:'Szedres csokoládé', 95:'Mézeskalács', 98:'Tiramisu',
+  105:'Zalavári gesztenye', 106:'Danubius', 107:'Alpesi karamell',
+  108:'Puncs', 116:'Oreo', 119:'Feketeerdő', 124:'Rákóczi-túrós',
+  134:'Dió', 135:'Krémes'
+};
+
+const INITIAL_ARAK = [
+  {id:1,sutiid:32,ertek:500,egyseg:'db'},
+  {id:2,sutiid:76,ertek:10900,egyseg:'16 szeletes'},
+  {id:3,sutiid:106,ertek:4300,egyseg:'8 szeletes'},
+  {id:4,sutiid:88,ertek:300,egyseg:'db'},
+  {id:5,sutiid:116,ertek:16200,egyseg:'24 szeletes'},
+  {id:6,sutiid:135,ertek:250,egyseg:'db'},
+  {id:7,sutiid:127,ertek:4400,egyseg:'kg'},
+  {id:8,sutiid:50,ertek:13400,egyseg:'24 szeletes'},
+  {id:9,sutiid:70,ertek:700,egyseg:'db'},
+  {id:10,sutiid:31,ertek:5200,egyseg:'kg'},
+  {id:11,sutiid:96,ertek:3300,egyseg:'kg'},
+  {id:12,sutiid:116,ertek:5700,egyseg:'8 szeletes'},
+  {id:13,sutiid:22,ertek:9000,egyseg:'16 szeletes'},
+  {id:14,sutiid:138,ertek:4400,egyseg:'kg'},
+  {id:15,sutiid:112,ertek:2900,egyseg:'kg'},
+  {id:16,sutiid:58,ertek:3200,egyseg:'kg'},
+  {id:17,sutiid:98,ertek:10400,egyseg:'16 szeletes'},
+  {id:18,sutiid:75,ertek:2100,egyseg:'rúd'},
+  {id:19,sutiid:24,ertek:11400,egyseg:'24 szeletes'},
+  {id:20,sutiid:62,ertek:600,egyseg:'db'},
+  {id:21,sutiid:61,ertek:8400,egyseg:'16 szeletes'},
+  {id:22,sutiid:105,ertek:10900,egyseg:'16 szeletes'},
+  {id:23,sutiid:20,ertek:4700,egyseg:'8 szeletes'},
+  {id:24,sutiid:123,ertek:1800,egyseg:'rúd'},
+  {id:25,sutiid:60,ertek:8200,egyseg:'16 szeletes'},
+  {id:26,sutiid:24,ertek:3900,egyseg:'8 szeletes'},
+  {id:27,sutiid:38,ertek:4300,egyseg:'8 szeletes'},
+  {id:28,sutiid:126,ertek:2100,egyseg:'rúd'},
+  {id:29,sutiid:64,ertek:750,egyseg:'db'},
+  {id:30,sutiid:109,ertek:300,egyseg:'db'}
+];
+
+// ── Komponensek ───────────────────────────────────────────
+function Alert({ msg, type }) {
+  if (!msg) return null;
+  return <div className={`alert alert-${type} show`}>{msg}</div>;
+}
+
+function ArForm({ initial, onSave, onCancel }) {
+  const [form, setForm] = useState(initial || { sutiid:'', ertek:'', egyseg:'db' });
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  return (
+    <div className="card">
+      <h2>{initial?.id ? '✏️ Szerkesztés' : '➕ Új ár hozzáadása'}</h2>
+      <div className="form-row">
+        <div>
+          <label>Sütemény ID</label>
+          <input type="number" value={form.sutiid} onChange={set('sutiid')} placeholder="pl. 22" />
+        </div>
+        <div>
+          <label>Ár (Ft)</label>
+          <input type="number" value={form.ertek} onChange={set('ertek')} placeholder="pl. 9000" />
+        </div>
+        <div>
+          <label>Egység</label>
+          <select value={form.egyseg} onChange={set('egyseg')}>
+            <option value="db">db</option>
+            <option value="kg">kg</option>
+            <option value="rúd">rúd</option>
+            <option value="koszorú">koszorú</option>
+            <option value="8 szeletes">8 szeletes</option>
+            <option value="12 szeletes">12 szeletes</option>
+            <option value="16 szeletes">16 szeletes</option>
+            <option value="24 szeletes">24 szeletes</option>
+            <option value="20 dkg">20 dkg</option>
+          </select>
+        </div>
+      </div>
+      <div style={{display:'flex', gap:'.8rem', flexWrap:'wrap'}}>
+        <button className="btn btn-primary" onClick={() => onSave(form)}>💾 Mentés</button>
+        <button className="btn btn-warning" onClick={onCancel}>✖ Mégsem</button>
+      </div>
+    </div>
+  );
+}
+
+function ArTable({ arak, onEdit, onDelete }) {
+  const [search, setSearch] = useState('');
+  const [filterEg, setFilterEg] = useState('');
+  const [page, setPage] = useState(1);
+  const PER = 10;
+
+  const filtered = useMemo(() => arak.filter(a => {
+    const name = SUTI_NAMES[a.sutiid] || '';
+    if (search && !name.toLowerCase().includes(search.toLowerCase()) && !String(a.sutiid).includes(search)) return false;
+    if (filterEg && a.egyseg !== filterEg) return false;
+    return true;
+  }), [arak, search, filterEg]);
+
+  const pages = Math.max(1, Math.ceil(filtered.length / PER));
+  const slice = filtered.slice((page-1)*PER, page*PER);
+
+  return (
+    <div className="card">
+      <h2>📋 Ár lista</h2>
+      <div className="filter-row" style={{display:'flex',gap:'.8rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+        <input type="text" placeholder="🔍 Sütemény neve…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} style={{maxWidth:'240px'}} />
+        <select value={filterEg} onChange={e=>{setFilterEg(e.target.value);setPage(1);}}>
+          <option value="">Minden egység</option>
+          {['db','kg','rúd','koszorú','8 szeletes','12 szeletes','16 szeletes','24 szeletes','20 dkg'].map(e=><option key={e}>{e}</option>)}
+        </select>
+        <span style={{marginLeft:'auto',fontSize:'.85rem',color:'#888',alignSelf:'center'}}>{filtered.length} rekord</span>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Sütemény ID</th><th>Sütemény neve</th><th>Ár (Ft)</th><th>Egység</th><th>Műveletek</th></tr>
+          </thead>
+          <tbody>
+            {slice.length === 0
+              ? <tr><td colSpan={6} style={{textAlign:'center',padding:'2rem',color:'#999'}}>Nincs találat</td></tr>
+              : slice.map(a => (
+                  <tr key={a.id}>
+                    <td>{a.id}</td>
+                    <td>{a.sutiid}</td>
+                    <td>{SUTI_NAMES[a.sutiid] || '–'}</td>
+                    <td><strong style={{color:'var(--burgundy)'}}>{a.ertek.toLocaleString('hu-HU')} Ft</strong></td>
+                    <td><span className="badge" style={{background:'#f0e4e4',color:'var(--burgundy)'}}>{a.egyseg}</span></td>
+                    <td style={{whiteSpace:'nowrap'}}>
+                      <button className="btn btn-warning btn-sm" onClick={()=>onEdit(a)}>✏️</button>
+                      <button className="btn btn-danger btn-sm" onClick={()=>onDelete(a.id)} style={{marginLeft:'.3rem'}}>🗑️</button>
+                    </td>
+                  </tr>
+                ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="pagination">
+        {Array.from({length:pages},(_,i)=>i+1).map(n=>(
+          <button key={n} className={n===page?'active':''} onClick={()=>setPage(n)}>{n}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────
+function App() {
+  const [arak, setArak]     = useState(INITIAL_ARAK);
+  const [editing, setEditing] = useState(null);   // null = new, object = edit
+  const [showForm, setShowForm] = useState(false);
+  const [alert, setAlert]   = useState({ msg:'', type:'success' });
+  const [nextId, setNextId] = useState(31);
+
+  function showMsg(msg, type='success') {
+    setAlert({ msg, type });
+    setTimeout(() => setAlert({ msg:'', type:'success' }), 3000);
+  }
+
+  function handleSave(form) {
+    const sutiid = parseInt(form.sutiid);
+    const ertek  = parseInt(form.ertek);
+    if (!sutiid || !ertek || !form.egyseg) { showMsg('⚠️ Minden mező kitöltése kötelező!','error'); return; }
+
+    if (editing?.id) {
+      setArak(prev => prev.map(a => a.id === editing.id ? { ...a, sutiid, ertek, egyseg: form.egyseg } : a));
+      showMsg('✅ Ár sikeresen módosítva!');
+    } else {
+      setArak(prev => [...prev, { id: nextId, sutiid, ertek, egyseg: form.egyseg }]);
+      setNextId(n => n + 1);
+      showMsg('✅ Új ár sikeresen hozzáadva!');
+    }
+    setShowForm(false);
+    setEditing(null);
+  }
+
+  function handleEdit(a) {
+    setEditing(a);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleDelete(id) {
+    if (!confirm('Biztosan törli ezt az árat?')) return;
+    setArak(prev => prev.filter(a => a.id !== id));
+    showMsg('🗑️ Ár törölve.');
+  }
+
+  // Statisztika
+  const avgPrice = Math.round(arak.reduce((s,a)=>s+a.ertek,0) / arak.length);
+  const maxPrice = Math.max(...arak.map(a=>a.ertek));
+
+  return (
+    <>
+      <Alert {...alert} />
+
+      {/* Stat boxes */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+        {[
+          {num: arak.length, lbl:'Árbejegyzés'},
+          {num: avgPrice.toLocaleString('hu-HU')+' Ft', lbl:'Átlagár'},
+          {num: maxPrice.toLocaleString('hu-HU')+' Ft', lbl:'Legdrágább'},
+        ].map(s=>(
+          <div key={s.lbl} style={{background:'white',borderRadius:'12px',padding:'1.4rem',textAlign:'center',boxShadow:'0 3px 12px var(--shadow)'}}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.8rem',color:'var(--burgundy)'}}>{s.num}</div>
+            <div style={{fontSize:'.8rem',color:'#888',textTransform:'uppercase',letterSpacing:'.05em'}}>{s.lbl}</div>
+          </div>
+        ))}
+        <div style={{background:'white',borderRadius:'12px',padding:'1.4rem',textAlign:'center',boxShadow:'0  3px 12px var(--shadow)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <button className="btn btn-primary" onClick={()=>{setEditing(null);setShowForm(true);}}>➕ Új ár</button>
+        </div>
+      </div>
+
+      {showForm && (
+        <ArForm
+          initial={editing}
+          onSave={handleSave}
+          onCancel={() => { setShowForm(false); setEditing(null); }}
+        />
+      )}
+
+      <ArTable arak={arak} onEdit={handleEdit} onDelete={handleDelete} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('react-root')).render(<App />);
+</script>
+</body>
+</html>
