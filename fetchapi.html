@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cukrászda – Fetch API CRUD</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .server-status { display:inline-flex; align-items:center; gap:.4rem; padding:.3rem .8rem; border-radius:20px; font-size:.8rem; font-weight:500; }
+    .status-ok     { background:#d4edda; color:#1a5e2a; }
+    .status-err    { background:#f8d7da; color:#7b1f27; }
+    .status-check  { background:#fff3cd; color:#856404; }
+    .tab-btns { display:flex; gap:.5rem; margin-bottom:1.2rem; flex-wrap:wrap; }
+    .tab-btn  { padding:.5rem 1.2rem; border:1.5px solid #e8d8d8; background:white; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:.88rem; transition:all .15s; }
+    .tab-btn.active { background:var(--burgundy); color:white; border-color:var(--burgundy); }
+  </style>
+</head>
+<body>
+
+<nav id="main-nav"></nav>
+
+<header class="site-header">
+  <h1>Web programozás-1 Előadás Házi feladat</h1>
+  <p class="subtitle">🌐 Fetch API CRUD – Szerveroldali adatkezelés</p>
+</header>
+
+<main>
+  <!-- Server status -->
+  <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+    <span id="srv-status" class="server-status status-check">⏳ Kapcsolódás…</span>
+    <span style="font-size:.85rem; color:#888;">Backend: <code>api/suti.php</code></span>
+    <button class="btn btn-warning btn-sm" onclick="checkServer()">🔄 Ellenőrzés</button>
+  </div>
+
+  <div id="alert" class="alert"></div>
+
+  <!-- Tab selector -->
+  <div class="tab-btns">
+    <button class="tab-btn active" onclick="switchTab('suti',this)">🍰 Sütik</button>
+    <button class="tab-btn" onclick="switchTab('ar',this)">💰 Árak</button>
+    <button class="tab-btn" onclick="switchTab('tartalom',this)">🌿 Tartalmak</button>
+  </div>
+
+  <!-- SUTI TAB -->
+  <div id="tab-suti">
+    <div class="card">
+      <h2 id="suti-form-title">➕ Új sütemény</h2>
+      <input type="hidden" id="suti-edit-id" />
+      <div class="form-row">
+        <div><label>Név *</label><input id="s-nev" type="text" placeholder="Sütemény neve" /></div>
+        <div>
+          <label>Típus *</label>
+          <select id="s-tipus">
+            <option value="">– válassz –</option>
+            <option>torta</option><option>tortaszelet</option><option>pite</option>
+            <option>bejgli</option><option>krémes</option><option>vegyes</option>
+            <option>édes teasütemény</option><option>sós teasütemény</option>
+            <option>tejszínes sütemény</option><option>különleges torta</option>
+          </select>
+        </div>
+        <div><label>Díjazott</label>
+          <select id="s-dij"><option value="0">Nem</option><option value="-1">Igen</option></select>
+        </div>
+      </div>
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveSuti()">💾 Mentés</button>
+        <button class="btn btn-warning" onclick="resetSutiForm()">✖ Mégsem</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>📋 Sütemény lista</h2>
+      <div style="display:flex;gap:.8rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <input id="suti-search" type="text" placeholder="🔍 Keresés…" oninput="renderSuti()" style="max-width:240px;" />
+        <button class="btn btn-success btn-sm" onclick="loadSuti()">🔄 Frissítés</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Név</th><th>Típus</th><th>Díjazott</th><th>Műveletek</th></tr></thead>
+          <tbody id="suti-tbody"><tr><td colspan="5" style="text-align:center;padding:2rem;color:#999;">Betöltés…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- AR TAB -->
+  <div id="tab-ar" style="display:none;">
+    <div class="card">
+      <h2 id="ar-form-title">➕ Új ár</h2>
+      <input type="hidden" id="ar-edit-id" />
+      <div class="form-row">
+        <div><label>Sütemény ID *</label><input id="a-sutiid" type="number" placeholder="pl. 22" /></div>
+        <div><label>Ár (Ft) *</label><input id="a-ertek" type="number" placeholder="pl. 9000" /></div>
+        <div><label>Egység *</label>
+          <select id="a-egyseg">
+            <option value="db">db</option><option value="kg">kg</option><option value="rúd">rúd</option>
+            <option value="koszorú">koszorú</option><option value="8 szeletes">8 szeletes</option>
+            <option value="12 szeletes">12 szeletes</option><option value="16 szeletes">16 szeletes</option>
+            <option value="24 szeletes">24 szeletes</option><option value="20 dkg">20 dkg</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveAr()">💾 Mentés</button>
+        <button class="btn btn-warning" onclick="resetArForm()">✖ Mégsem</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>💰 Ár lista</h2>
+      <div style="display:flex;gap:.8rem;margin-bottom:1rem;">
+        <button class="btn btn-success btn-sm" onclick="loadAr()">🔄 Frissítés</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Sütemény ID</th><th>Sütemény neve</th><th>Ár</th><th>Egység</th><th>Műveletek</th></tr></thead>
+          <tbody id="ar-tbody"><tr><td colspan="6" style="text-align:center;padding:2rem;color:#999;">Betöltés…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TARTALOM TAB -->
+  <div id="tab-tartalom" style="display:none;">
+    <div class="card">
+      <h2 id="tar-form-title">➕ Új mentesség adat</h2>
+      <input type="hidden" id="tar-edit-id" />
+      <div class="form-row">
+        <div><label>Sütemény ID *</label><input id="t-sutiid" type="number" placeholder="pl. 26" /></div>
+        <div><label>Mentesség kód *</label>
+          <select id="t-mentes">
+            <option value="G">G – Gluténmentes</option>
+            <option value="L">L – Laktózmentes</option>
+            <option value="HC">HC – Hozzáadott cukor mentes</option>
+            <option value="Te">Te – Tejmentes</option>
+            <option value="To">To – Tojásmentes</option>
+            <option value="É">É – Édesítőszermentes</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveTartalom()">💾 Mentés</button>
+        <button class="btn btn-warning" onclick="resetTarForm()">✖ Mégsem</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🌿 Mentesség lista</h2>
+      <div style="display:flex;gap:.8rem;margin-bottom:1rem;">
+        <button class="btn btn-success btn-sm" onclick="loadTartalom()">🔄 Frissítés</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Sütemény ID</th><th>Sütemény neve</th><th>Kód</th><th>Leírás</th><th>Műveletek</th></tr></thead>
+          <tbody id="tar-tbody"><tr><td colspan="6" style="text-align:center;padding:2rem;color:#999;">Betöltés…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer id="main-footer"></footer>
+<script src="js/shared-nav.js"></script>
+<script>
+/* =====================================================
+   Fetch API CRUD – Szerveroldali SQLite adatbázis
+   Backend: PHP backend (Nethely)
+   Madarász Dóra | TFO727
+   Mészáros Márton Bence | KUS0K8
+   ===================================================== */
+
+// PHP backend 
+const API = 'api';
+let sutiCache  = [];
+let arCache    = [];
+let tarCache   = [];
+
+const MENTES_LABEL = {
+  'G':'Gluténmentes','L':'Laktózmentes','HC':'Hozzáadott cukor mentes',
+  'Te':'Tejmentes','To':'Tojásmentes','É':'Édesítőszermentes'
+};
+
+// ── UI segédek ─────────────────────────────────────────────
+function showAlert(msg, type='success') {
+  const el = document.getElementById('alert');
+  el.textContent = msg;
+  el.className   = `alert alert-${type} show`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function switchTab(name, btn) {
+  ['suti','ar','tartalom'].forEach(t => {
+    document.getElementById(`tab-${t}`).style.display = t === name ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (name === 'suti') loadSuti();
+  if (name === 'ar')   loadAr();
+  if (name === 'tartalom') loadTartalom();
+}
+
+// ── Server check ───────────────────────────────────────────
+async function checkServer() {
+  const el = document.getElementById('srv-status');
+  el.className = 'server-status status-check'; el.textContent = '⏳ Ellenőrzés…';
+  try {
+    const r = await fetch('api/suti.php', { signal: AbortSignal.timeout(3000) });
+    if (r.ok) { el.className='server-status status-ok'; el.textContent='✅ Szerver elérhető'; loadSuti(); }
+    else throw new Error();
+  } catch {
+    el.className='server-status status-err';
+    el.textContent='❌ Szerver nem elérhető – indítsd el a backend-et!';
+  }
+}
+
+// ── SUTI ───────────────────────────────────────────────────
+async function loadSuti() {
+  try {
+    const r    = await fetch(`api/suti.php`);
+    sutiCache  = await r.json();
+    renderSuti();
+  } catch { document.getElementById('suti-tbody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--rose)">❌ Nem sikerült betölteni (szerver nem fut?)</td></tr>'; }
+}
+
+function renderSuti() {
+  const q    = document.getElementById('suti-search').value.toLowerCase();
+  const data = sutiCache.filter(s => !q || s.nev.toLowerCase().includes(q));
+  document.getElementById('suti-tbody').innerHTML = data.length
+    ? data.map(s=>`
+        <tr>
+          <td>${s.id}</td>
+          <td>${s.nev}</td>
+          <td><span class="badge" style="background:#f0e4e4;color:var(--burgundy)">${s.tipus}</span></td>
+          <td>${s.dijazott===-1?'<span class="badge badge-yes">🏆 Igen</span>':'<span class="badge badge-no">–</span>'}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-warning btn-sm" onclick="editSuti(${s.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSuti(${s.id})" style="margin-left:.3rem">🗑️</button>
+          </td>
+        </tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:1.5rem;color:#999">Nincs találat</td></tr>';
+}
+
+async function saveSuti() {
+  const nev    = document.getElementById('s-nev').value.trim();
+  const tipus  = document.getElementById('s-tipus').value;
+  const dij    = parseInt(document.getElementById('s-dij').value);
+  const editId = document.getElementById('suti-edit-id').value;
+  if (!nev||!tipus) { showAlert('⚠️ Név és típus kötelező!','error'); return; }
+
+  try {
+    const method = editId ? 'PUT' : 'POST';
+    const url    = editId ? `api/suti.php?id=${editId}` : `api/suti.php`;
+    const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify({nev,tipus,dijazott:dij}) });
+    if (!r.ok) throw new Error();
+    showAlert(editId ? '✅ Módosítva!' : '✅ Hozzáadva!');
+    resetSutiForm(); loadSuti();
+  } catch { showAlert('❌ Mentés sikertelen!','error'); }
+}
+
+function editSuti(id) {
+  const s = sutiCache.find(x=>x.id===id); if(!s) return;
+  document.getElementById('suti-edit-id').value = s.id;
+  document.getElementById('s-nev').value        = s.nev;
+  document.getElementById('s-tipus').value      = s.tipus;
+  document.getElementById('s-dij').value        = String(s.dijazott);
+  document.getElementById('suti-form-title').textContent = `✏️ Szerkesztés: ${s.nev}`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function deleteSuti(id) {
+  const s = sutiCache.find(x=>x.id===id);
+  if (!confirm(`Biztosan törli? „${s?.nev}"`)) return;
+  try {
+    await fetch(`api/suti.php?id=${id}`,{method:'DELETE'});
+    showAlert('🗑️ Törölve!'); loadSuti();
+  } catch { showAlert('❌ Törlés sikertelen!','error'); }
+}
+
+function resetSutiForm() {
+  document.getElementById('suti-edit-id').value='';
+  document.getElementById('s-nev').value='';
+  document.getElementById('s-tipus').value='';
+  document.getElementById('s-dij').value='0';
+  document.getElementById('suti-form-title').textContent='➕ Új sütemény';
+}
+
+// ── AR ─────────────────────────────────────────────────────
+async function loadAr() {
+  try {
+    const r  = await fetch(`api/ar.php`);
+    arCache  = await r.json();
+    renderAr();
+  } catch { document.getElementById('ar-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose)">❌ Nem sikerült betölteni</td></tr>'; }
+}
+
+function renderAr() {
+  document.getElementById('ar-tbody').innerHTML = arCache.length
+    ? arCache.map(a=>`
+        <tr>
+          <td>${a.id}</td><td>${a.sutiid}</td>
+          <td>${a.suti_nev||'–'}</td>
+          <td><strong style="color:var(--burgundy)">${Number(a.ertek).toLocaleString('hu-HU')} Ft</strong></td>
+          <td><span class="badge" style="background:#f0e4e4;color:var(--burgundy)">${a.egyseg}</span></td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-warning btn-sm" onclick="editAr(${a.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteAr(${a.id})" style="margin-left:.3rem">🗑️</button>
+          </td>
+        </tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:#999">Nincs adat</td></tr>';
+}
+
+async function saveAr() {
+  const sutiid = document.getElementById('a-sutiid').value;
+  const ertek  = document.getElementById('a-ertek').value;
+  const egyseg = document.getElementById('a-egyseg').value;
+  const editId = document.getElementById('ar-edit-id').value;
+  if (!sutiid||!ertek) { showAlert('⚠️ Minden mező kötelező!','error'); return; }
+  try {
+    const method = editId ? 'PUT' : 'POST';
+    const url    = editId ? `api/ar.php?id=${editId}` : `api/ar.php`;
+    const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify({sutiid:+sutiid,ertek:+ertek,egyseg}) });
+    if (!r.ok) throw new Error();
+    showAlert(editId ? '✅ Módosítva!' : '✅ Hozzáadva!');
+    resetArForm(); loadAr();
+  } catch { showAlert('❌ Mentés sikertelen!','error'); }
+}
+
+function editAr(id) {
+  const a = arCache.find(x=>x.id===id); if(!a) return;
+  document.getElementById('ar-edit-id').value = a.id;
+  document.getElementById('a-sutiid').value   = a.sutiid;
+  document.getElementById('a-ertek').value    = a.ertek;
+  document.getElementById('a-egyseg').value   = a.egyseg;
+  document.getElementById('ar-form-title').textContent = `✏️ Ár szerkesztése (ID: ${a.id})`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function deleteAr(id) {
+  if (!confirm('Biztosan törli ezt az árat?')) return;
+  try {
+    await fetch(`api/ar.php?id=${id}`,{method:'DELETE'});
+    showAlert('🗑️ Törölve!'); loadAr();
+  } catch { showAlert('❌ Törlés sikertelen!','error'); }
+}
+
+function resetArForm() {
+  document.getElementById('ar-edit-id').value='';
+  document.getElementById('a-sutiid').value='';
+  document.getElementById('a-ertek').value='';
+  document.getElementById('a-egyseg').value='db';
+  document.getElementById('ar-form-title').textContent='➕ Új ár';
+}
+
+// ── TARTALOM ────────────────────────────────────────────────
+async function loadTartalom() {
+  try {
+    const r  = await fetch(`api/tartalom.php`);
+    tarCache = await r.json();
+    renderTartalom();
+  } catch { document.getElementById('tar-tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--rose)">❌ Nem sikerült betölteni</td></tr>'; }
+}
+
+function renderTartalom() {
+  document.getElementById('tar-tbody').innerHTML = tarCache.length
+    ? tarCache.map(t=>`
+        <tr>
+          <td>${t.id}</td><td>${t.sutiid}</td>
+          <td>${t.suti_nev||'–'}</td>
+          <td><span class="badge badge-g">${t.mentes}</span></td>
+          <td style="font-size:.85rem;color:#666">${MENTES_LABEL[t.mentes]||t.mentes}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-warning btn-sm" onclick="editTartalom(${t.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteTartalom(${t.id})" style="margin-left:.3rem">🗑️</button>
+          </td>
+        </tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:#999">Nincs adat</td></tr>';
+}
+
+async function saveTartalom() {
+  const sutiid = document.getElementById('t-sutiid').value;
+  const mentes = document.getElementById('t-mentes').value;
+  const editId = document.getElementById('tar-edit-id').value;
+  if (!sutiid) { showAlert('⚠️ Sütemény ID kötelező!','error'); return; }
+  try {
+    const method = editId ? 'PUT' : 'POST';
+    const url    = editId ? `api/tartalom.php?id=${editId}` : `api/tartalom.php`;
+    const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify({sutiid:+sutiid,mentes}) });
+    if (!r.ok) throw new Error();
+    showAlert(editId ? '✅ Módosítva!' : '✅ Hozzáadva!');
+    resetTarForm(); loadTartalom();
+  } catch { showAlert('❌ Mentés sikertelen!','error'); }
+}
+
+function editTartalom(id) {
+  const t = tarCache.find(x=>x.id===id); if(!t) return;
+  document.getElementById('tar-edit-id').value = t.id;
+  document.getElementById('t-sutiid').value    = t.sutiid;
+  document.getElementById('t-mentes').value    = t.mentes;
+  document.getElementById('tar-form-title').textContent = `✏️ Szerkesztés (ID: ${t.id})`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function deleteTartalom(id) {
+  if (!confirm('Biztosan törli?')) return;
+  try {
+    await fetch(`api/tartalom.php?id=${id}`,{method:'DELETE'});
+    showAlert('🗑️ Törölve!'); loadTartalom();
+  } catch { showAlert('❌ Törlés sikertelen!','error'); }
+}
+
+function resetTarForm() {
+  document.getElementById('tar-edit-id').value='';
+  document.getElementById('t-sutiid').value='';
+  document.getElementById('t-mentes').value='G';
+  document.getElementById('tar-form-title').textContent='➕ Új mentesség adat';
+}
+
+// ── Init ──────────────────────────────────────────────────
+checkServer();
+</script>
+</body>
+</html>
