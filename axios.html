@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cukrászda – Axios CRUD</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<nav id="main-nav"></nav>
+
+<header class="site-header">
+  <h1>Web programozás-1 Előadás Házi feladat</h1>
+  <p class="subtitle">🔄 React + Axios CRUD – REST API integráció</p>
+</header>
+
+<main>
+  <div id="axios-root"></div>
+</main>
+
+<footer id="main-footer"></footer>
+<script src="js/shared-nav.js"></script>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<script type="text/babel">
+/* =====================================================
+   React + Axios CRUD – Tartalom (mentességek) kezelése
+   Axios interceptor + hibakezelés
+   Madarász Dóra | TFO727
+   ===================================================== */
+const { useState, useEffect, useRef } = React;
+
+// PHP backend URL – Nethely feltöltés után módosítsd!
+const API_URL = window.location.origin + "/api";
+
+// ── Axios példány ─────────────────────────────────────────
+const api = axios.create({ baseURL: window.location.origin.includes('localhost') ? 'http://localhost/cukraszda/api' : window.location.origin + '/api', timeout: 5000 });
+
+// Request interceptor – minden kérés előtt
+api.interceptors.request.use(config => {
+  config.metadata = { startTime: Date.now() };
+  return config;
+}, error => Promise.reject(error));
+
+// Response interceptor – minden válasz után
+api.interceptors.response.use(
+  response => {
+    const ms = Date.now() - response.config.metadata.startTime;
+    console.log(`[Axios] ${response.config.method?.toUpperCase()} ${response.config.url} → ${response.status} (${ms}ms)`);
+    return response;
+  },
+  error => {
+    console.error('[Axios Error]', error.message);
+    return Promise.reject(error);
+  }
+);
+
+const MENTES_LABEL = {
+  'G':'Gluténmentes','L':'Laktózmentes','HC':'Hozzáadott cukor mentes',
+  'Te':'Tejmentes','To':'Tojásmentes','É':'Édesítőszermentes'
+};
+
+const MENTES_COLORS = {
+  G:'#fff3cd:#856404', L:'#cfe2ff:#0a367a', HC:'#f0d6f5:#5a1a7a',
+  Te:'#d1f0e0:#1a5e2a', To:'#fde8d0:#7a3a00', É:'#f8d7da:#7b1f27'
+};
+
+// ── Komponensek ───────────────────────────────────────────
+function ServerStatus({ status, ping }) {
+  const cfg = {
+    ok:      { cls:'', bg:'#d4edda', color:'#1a5e2a', icon:'✅', txt:'Szerver elérhető' },
+    error:   { cls:'', bg:'#f8d7da', color:'#7b1f27', icon:'❌', txt:'Szerver nem elérhető' },
+    loading: { cls:'', bg:'#fff3cd', color:'#856404', icon:'⏳', txt:'Kapcsolódás…' }
+  }[status] || { bg:'#eee', color:'#333', icon:'?', txt:'Ismeretlen' };
+
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'1.5rem',flexWrap:'wrap'}}>
+      <span style={{display:'inline-flex',alignItems:'center',gap:'.4rem',padding:'.3rem .9rem',borderRadius:'20px',fontSize:'.82rem',fontWeight:500,background:cfg.bg,color:cfg.color}}>
+        {cfg.icon} {cfg.txt} {ping && status==='ok' && <span style={{opacity:.7}}>({ping}ms)</span>}
+      </span>
+      <code style={{fontSize:'.8rem',color:'#888'}}>http://localhost:3000</code>
+    </div>
+  );
+}
+
+function Alert({ msg, type, onClose }) {
+  if (!msg) return null;
+  return (
+    <div className={`alert alert-${type} show`} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      <span>{msg}</span>
+      <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',color:'inherit'}}>✕</button>
+    </div>
+  );
+}
+
+function RequestLog({ logs }) {
+  if (!logs.length) return null;
+  return (
+    <div className="card">
+      <h2>📡 Axios kérések naplója</h2>
+      <div style={{fontFamily:'monospace',fontSize:'.8rem',maxHeight:'180px',overflowY:'auto'}}>
+        {logs.map((l,i) => (
+          <div key={i} style={{padding:'.3rem .5rem',borderRadius:'4px',marginBottom:'.2rem',
+            background: l.ok ? '#f0fff4' : '#fff0f0',
+            color: l.ok ? '#1a5e2a' : '#7b1f27'}}>
+            {l.time} {l.method} {l.url} → {l.status} {l.ok ? '✓' : '✗'}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SutiForm({ initial, onSave, onCancel, loading }) {
+  const [form, setForm] = useState(initial || { sutiid:'', mentes:'G' });
+  const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
+
+  useEffect(() => { setForm(initial || { sutiid:'', mentes:'G' }); }, [initial]);
+
+  return (
+    <div className="card">
+      <h2>{initial?.id ? `✏️ Szerkesztés (ID: ${initial.id})` : '➕ Új mentesség adat'}</h2>
+      <div className="form-row">
+        <div>
+          <label>Sütemény ID *</label>
+          <input type="number" value={form.sutiid} onChange={set('sutiid')} placeholder="pl. 26" />
+        </div>
+        <div>
+          <label>Mentesség *</label>
+          <select value={form.mentes} onChange={set('mentes')}>
+            {Object.entries(MENTES_LABEL).map(([k,v]) => <option key={k} value={k}>{k} – {v}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:'.8rem',flexWrap:'wrap'}}>
+        <button className="btn btn-primary" onClick={() => onSave(form)} disabled={loading}>
+          {loading ? <><span className="spinner"></span>Mentés…</> : '💾 Mentés'}
+        </button>
+        <button className="btn btn-warning" onClick={onCancel} disabled={loading}>✖ Mégsem</button>
+      </div>
+    </div>
+  );
+}
+
+function TartalomTable({ data, onEdit, onDelete, loading }) {
+  const [search, setSearch] = useState('');
+  const [filterMentes, setFilterMentes] = useState('');
+
+  const filtered = data.filter(t => {
+    if (search && !String(t.sutiid).includes(search) && !(t.suti_nev||'').toLowerCase().includes(search.toLowerCase())) return false;
+    if (filterMentes && t.mentes !== filterMentes) return false;
+    return true;
+  });
+
+  return (
+    <div className="card">
+      <h2>🌿 Mentesség lista ({data.length} rekord)</h2>
+      <div style={{display:'flex',gap:'.8rem',marginBottom:'1rem',flexWrap:'wrap'}}>
+        <input type="text" placeholder="🔍 ID vagy sütemény neve…" value={search}
+          onChange={e=>setSearch(e.target.value)} style={{maxWidth:'240px'}} />
+        <select value={filterMentes} onChange={e=>setFilterMentes(e.target.value)}>
+          <option value="">Minden kód</option>
+          {Object.entries(MENTES_LABEL).map(([k,v])=><option key={k} value={k}>{k} – {v}</option>)}
+        </select>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>Sütemény ID</th><th>Sütemény neve</th><th>Kód</th><th>Leírás</th><th>Műveletek</th></tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} style={{textAlign:'center',padding:'2rem',color:'#999'}}><span className="spinner" style={{borderColor:'rgba(139,46,46,.3)',borderTopColor:'var(--burgundy)'}}></span> Betöltés…</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} style={{textAlign:'center',padding:'2rem',color:'#999'}}>Nincs találat</td></tr>
+            ) : filtered.map(t => {
+              const [bg,col] = (MENTES_COLORS[t.mentes]||'#eee:#333').split(':');
+              return (
+                <tr key={t.id}>
+                  <td>{t.id}</td>
+                  <td>{t.sutiid}</td>
+                  <td>{t.suti_nev||'–'}</td>
+                  <td><span className="badge" style={{background:bg,color:col}}>{t.mentes}</span></td>
+                  <td style={{fontSize:'.85rem',color:'#666'}}>{MENTES_LABEL[t.mentes]||t.mentes}</td>
+                  <td style={{whiteSpace:'nowrap'}}>
+                    <button className="btn btn-warning btn-sm" onClick={()=>onEdit(t)}>✏️</button>
+                    <button className="btn btn-danger btn-sm" onClick={()=>onDelete(t.id)} style={{marginLeft:'.3rem'}}>🗑️</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────
+function App() {
+  const [tartalom, setTartalom] = useState([]);
+  const [editing, setEditing]   = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [alert, setAlert]       = useState({ msg:'', type:'success' });
+  const [loadingData, setLoadingData] = useState(true);
+  const [savingData, setSavingData]   = useState(false);
+  const [serverStatus, setServerStatus] = useState('loading');
+  const [serverPing, setServerPing]     = useState(null);
+  const [reqLog, setReqLog]     = useState([]);
+
+  function logRequest(method, url, status, ok) {
+    const time = new Date().toLocaleTimeString('hu-HU');
+    setReqLog(prev => [{ time, method, url, status, ok }, ...prev.slice(0,9)]);
+  }
+
+  function showMsg(msg, type='success') {
+    setAlert({ msg, type });
+  }
+
+  // ── CRUD helpers ────────────────────────────────────────
+  async function checkServer() {
+    setServerStatus('loading');
+    const t0 = Date.now();
+    try {
+      const r = await api.get('/suti.php');
+      const ping = Date.now() - t0;
+      setServerStatus('ok');
+      setServerPing(ping);
+      logRequest('GET','/api/suti', r.status, true);
+    } catch {
+      setServerStatus('error');
+      logRequest('GET','/api/suti','ERR',false);
+    }
+  }
+
+  async function loadData() {
+    setLoadingData(true);
+    try {
+      const r = await api.get('/tartalom.php');
+      setTartalom(r.data);
+      logRequest('GET','/api/tartalom', r.status, true);
+    } catch(e) {
+      showMsg('❌ Nem sikerült betölteni az adatokat. Fut a szerver?', 'error');
+      logRequest('GET','/api/tartalom','ERR',false);
+    } finally { setLoadingData(false); }
+  }
+
+  async function handleSave(form) {
+    const sutiid = parseInt(form.sutiid);
+    const mentes = form.mentes;
+    if (!sutiid) { showMsg('⚠️ Sütemény ID kötelező!','error'); return; }
+    setSavingData(true);
+    try {
+      if (editing?.id) {
+        const r = await api.put(`/tartalom.php?id=${editing.id}`, { sutiid, mentes });
+        logRequest('PUT', `/api/tartalom/${editing.id}`, r.status, true);
+        showMsg('✅ Mentesség sikeresen módosítva!');
+      } else {
+        const r = await api.post('/tartalom.php', { sutiid, mentes });
+        logRequest('POST', '/api/tartalom', r.status, true);
+        showMsg('✅ Új mentesség sikeresen hozzáadva!');
+      }
+      setShowForm(false); setEditing(null);
+      loadData();
+    } catch(e) {
+      const code = e.response?.status || 'ERR';
+      logRequest(editing?.id?'PUT':'POST', '/api/tartalom', code, false);
+      showMsg('❌ Mentés sikertelen! Ellenőrizd a szervert.', 'error');
+    } finally { setSavingData(false); }
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Biztosan törli ezt a bejegyzést?')) return;
+    try {
+      const r = await api.delete(`/tartalom.php?id=${id}`);
+      logRequest('DELETE', `/api/tartalom/${id}`, r.status, true);
+      showMsg('🗑️ Bejegyzés törölve!');
+      loadData();
+    } catch(e) {
+      const code = e.response?.status || 'ERR';
+      logRequest('DELETE', `/api/tartalom/${id}`, code, false);
+      showMsg('❌ Törlés sikertelen!', 'error');
+    }
+  }
+
+  function handleEdit(t) {
+    setEditing(t);
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  useEffect(() => {
+    checkServer().then(loadData);
+  }, []);
+
+  // Statisztika
+  const stats = Object.entries(MENTES_LABEL).map(([k,v]) => ({
+    kod: k, nev: v, count: tartalom.filter(t=>t.mentes===k).length
+  })).filter(s => s.count > 0);
+
+  return (
+    <>
+      <ServerStatus status={serverStatus} ping={serverPing} />
+      <Alert msg={alert.msg} type={alert.type} onClose={()=>setAlert({msg:'',type:'success'})} />
+
+      {/* Stat boxes */}
+      {stats.length > 0 && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:'.8rem',marginBottom:'1.5rem'}}>
+          {stats.map(s => {
+            const [bg,col] = (MENTES_COLORS[s.kod]||'#eee:#333').split(':');
+            return (
+              <div key={s.kod} style={{background:'white',borderRadius:'10px',padding:'1rem',textAlign:'center',boxShadow:'0 3px 10px var(--shadow)'}}>
+                <div style={{fontFamily:"'Playfair Display',serif",fontSize:'1.8rem',color:'var(--burgundy)'}}>{s.count}</div>
+                <span className="badge" style={{background:bg,color:col,marginTop:'.3rem'}}>{s.kod}</span>
+                <div style={{fontSize:'.75rem',color:'#888',marginTop:'.3rem'}}>{s.nev}</div>
+              </div>
+            );
+          })}
+          <div style={{background:'white',borderRadius:'10px',padding:'1rem',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 3px 10px var(--shadow)'}}>
+            <button className="btn btn-primary btn-sm" onClick={()=>{setEditing(null);setShowForm(true);}}>➕ Új adat</button>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <SutiForm
+          initial={editing}
+          onSave={handleSave}
+          onCancel={() => { setShowForm(false); setEditing(null); }}
+          loading={savingData}
+        />
+      )}
+
+      <TartalomTable
+        data={tartalom}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        loading={loadingData}
+      />
+
+      <RequestLog logs={reqLog} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('axios-root')).render(<App />);
+</script>
+</body>
+</html>
